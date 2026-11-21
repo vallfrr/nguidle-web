@@ -72,6 +72,27 @@ with sync_playwright() as playwright:
     desktop.screenshot(path=args.out / "mouse.png")
     desktop.mouse.move(335, 710)
     await_tooltip(desktop, False)
+
+    # Place focus on Spend EXP, one row below Rebirth.
+    desktop.evaluate("() => hoverTest(['focus_at,85,450'])")
+    desktop.locator("#game").focus()
+    desktop.keyboard.press("F1")
+    desktop.keyboard.press("ArrowUp")
+    await_tooltip(desktop, True)
+    desktop.mouse.move(336, 710)
+    await_tooltip(desktop, False)
+
+    desktop.evaluate("""() => {
+      hoverTest(['focus_at,85,450']);
+      const buttons = Array.from({ length: 16 }, (_, i) => ({ pressed: i === 12 }));
+      Object.defineProperty(navigator, "getGamepads", {
+        value: () => [{ buttons, axes: [0, 0, 0, 0] }],
+      });
+      setTimeout(() => { buttons[12].pressed = false; }, 90);
+    }""")
+    await_tooltip(desktop, True)
+    desktop.mouse.move(337, 710)
+    await_tooltip(desktop, False)
     desktop.mouse.move(103, 508)
     await_tooltip(desktop, True)
     desktop.set_viewport_size({"width": 250, "height": 900})
@@ -94,4 +115,4 @@ with sync_playwright() as playwright:
     await_tooltip(phone, False)
     browser.close()
 
-print("Native tooltips passed mouse enter and exit, resize, and touch hold without a click.")
+print("Native tooltips passed mouse, keyboard focus, gamepad focus, resize, and touch hold.")
