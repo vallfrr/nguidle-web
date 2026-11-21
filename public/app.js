@@ -1,25 +1,28 @@
-"use strict";
+import { boot } from '/engine.js';
+import { initialProfile, saves } from '/saves.js';
 
 const byId = (id) => document.getElementById(id);
 const canvas = byId("game");
 const surface = byId("surface");
-const ctx = canvas.getContext("2d", { alpha: false });
-const status = byId("status");
-const connecting = byId("connecting");
+const failure = byId("failure");
+
 const file = byId("save-file");
-const textDialog = byId("text-dialog");
+
 const gameText = byId("game-text");
-const exportDialog = byId("export-dialog");
-const importDialog = byId("import-dialog");
-let selectedSave;
+
+
+let pickerSlot;
 const pending = [];
-let inFlight = false;
-let lastRequest = 0;
+let engine;
+let saveService;
+let previousFrame;
+let frameInfo;
+let resolution;
 let gotFrame = false;
 let keyboardFocus = false;
 let textOpen = false;
 let waitingForTextClose = false;
-let dragDepth = 0;
+
 
 function enqueue(event) {
   const last = pending.at(-1);
@@ -37,23 +40,50 @@ function point(event) {
   return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
 }
 
+let touch;
 canvas.addEventListener("pointerdown", (event) => {
-  if (!event.isPrimary || !gotFrame) return;
+  if (!event.isPrimary) {
+    if (event.pointerType === "touch" && touch && !touch.dragging) touch.secondary = true;
+    return;
+  }
+  if (!gotFrame) return;
   canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(event.pointerId);
-  enqueue({ type: "button", ...point(event), button: event.button, down: true });
+  if (event.pointerType === "touch") {
+    touch = { start: point(event), x: event.clientX, y: event.clientY, dragging: false, secondary: false };
+    enqueue({ type: "move", ...touch.start });
+  } else {
+    enqueue({ type: "button", ...point(event), button: event.button, down: true });
+  }
   event.preventDefault();
 });
 canvas.addEventListener("pointermove", (event) => {
-  if (event.isPrimary && gotFrame) enqueue({ type: "move", ...point(event) });
+  if (!event.isPrimary || !gotFrame) return;
+  if (touch && !touch.dragging && !touch.secondary && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 5) {
+    touch.dragging = true;
+    enqueue({ type: "button", ...touch.start, button: 0, down: true });
+  }
+  enqueue({ type: "move", ...point(event) });
 });
 canvas.addEventListener("pointerup", (event) => {
   if (event.isPrimary && gotFrame) {
-    enqueue({ type: "button", ...point(event), button: event.button, down: false });
+    if (event.pointerType === "touch" && touch) {
+      const button = touch.secondary ? 2 : 0;
+      if (!touch.dragging) enqueue({ type: "button", ...touch.start, button, down: true });
+      enqueue({ type: "button", ...point(event), button, down: false });
+      touch = undefined;
+    } else {
+      enqueue({ type: "button", ...point(event), button: event.button, down: false });
+    }
     if (event.pointerType !== "mouse") enqueue({ type: "move", x: -1, y: -1 });
   }
 });
-canvas.addEventListener("pointercancel", () => enqueue({ type: "reset" }));
+canvas.addEventListener("pointercancel", (event) => {
+  if (event.isPrimary) {
+    touch = undefined;
+    enqueue({ type: "reset" });
+  }
+});
 canvas.addEventListener("pointerleave", (event) => {
   if (!canvas.hasPointerCapture(event.pointerId)) enqueue({ type: "move", x: -1, y: -1 });
 });
@@ -70,11 +100,10 @@ const heldKeys = new Set();
 canvas.addEventListener("keydown", (event) => {
   if (event.key === "F1" && !event.repeat) {
     keyboardFocus = !keyboardFocus;
-    status.textContent = keyboardFocus ? "Keyboard focus navigation enabled. F1 switches back." : "Game keyboard shortcuts enabled.";
     event.preventDefault();
     return;
   }
-  if (keyboardFocus && directions[event.key]) {
+  if ((keyboardFocus || frameInfo?.home) && directions[event.key]) {
     enqueue({ type: "navigate", action: directions[event.key] });
     event.preventDefault();
     return;
@@ -89,6 +118,7 @@ canvas.addEventListener("keyup", (event) => {
   if (heldKeys.delete(event.code)) enqueue({ type: "key", key: event.key, right: event.location === 2, down: false, repeat: false });
 });
 window.addEventListener("blur", () => {
+  touch = undefined;
   heldKeys.clear();
   enqueue({ type: "reset" });
 });
@@ -133,154 +163,152 @@ function pollGamepad(now) {
   if (x || y) enqueue({ type: "scroll", x, y });
 }
 
-function showText(encoded) {
-  if (!encoded) {
-    waitingForTextClose = false;
-    return;
-  }
-  if (textOpen || waitingForTextClose) return;
-  const request = JSON.parse(decodeURIComponent(encoded));
-  textOpen = true;
-  gameText.value = request.value;
-  gameText.maxLength = request.max;
-  gameText.inputMode = request.numeric ? "decimal" : "text";
-  textDialog.returnValue = "cancel";
-  textDialog.showModal();
-  gameText.focus();
-  gameText.select();
+function place(element, rect) {
+  const [left, top, right, bottom] = rect;
+  Object.assign(element.style, {
+    left: left * 100 + "%", top: top * 100 + "%",
+    width: (right - left) * 100 + "%", height: (bottom - top) * 100 + "%",
+  });
 }
-textDialog.addEventListener("close", () => {
-  enqueue({ type: "text", value: textDialog.returnValue === "apply" ? gameText.value : null });
+
+function endText(apply) {
+  if (!textOpen) return;
   textOpen = false;
   waitingForTextClose = true;
-  canvas.focus({ preventScroll: true });
+  enqueue({ type: "text", value: apply ? gameText.value : null });
+  gameText.hidden = true;
+}
+
+function showText(request) {
+  if (!request) {
+    waitingForTextClose = false;
+    if (textOpen) endText(false);
+    return;
+  }
+  place(gameText, request.rect);
+  if (textOpen || waitingForTextClose) return;
+  gameText.value = request.value;
+  gameText.maxLength = request.max || 1024;
+  gameText.inputMode = request.numeric ? "decimal" : "text";
+  gameText.hidden = false;
+  textOpen = true;
+  gameText.focus({ preventScroll: true });
+  gameText.select();
+}
+
+gameText.addEventListener("keydown", event => {
+  if (event.key === "Enter" || event.key === "Escape") {
+    event.preventDefault();
+    endText(event.key === "Enter");
+    canvas.focus({ preventScroll: true });
+  }
+});
+gameText.addEventListener("blur", () => endText(true));
+
+function notice(message) {
+  enqueue({ type: "notice", message });
+}
+
+async function importFile(save, slot) {
+  if (!save || !slot) return;
+  if (!save.size || save.size > 16 * 1024 * 1024) {
+    notice("Choose a nonempty NGU Idle save smaller than 16 MB.");
+    return;
+  }
+  try {
+    await saveService.importSave(slot, await save.text());
+    notice("Save imported into Slot " + slot + ".");
+  } catch (error) { notice(error.message); }
+}
+
+file.addEventListener("click", () => { pickerSlot = frameInfo?.import?.[0]; });
+file.addEventListener("change", () => {
+  void importFile(file.files[0], pickerSlot);
+  file.value = "";
+});
+file.addEventListener("pointermove", event => {
+  if (event.pointerType === "mouse") enqueue({ type: "move", ...point(event) });
+});
+surface.addEventListener("dragover", event => {
+  if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+});
+surface.addEventListener("drop", event => {
+  event.preventDefault();
+  const target = frameInfo?.import?.[0];
+  if (target) void importFile(event.dataTransfer.files[0], target);
+  else notice("Open Load Game and select an empty slot before importing.");
 });
 
-async function frame(now) {
-  requestAnimationFrame(frame);
-  pollGamepad(now);
-  if (inFlight || document.hidden || now - lastRequest < 1000 / 30) return;
-  inFlight = true;
-  lastRequest = now;
-  const rect = canvas.getBoundingClientRect();
-  const scale = Math.min(window.devicePixelRatio || 1, 1.5, 1280 / rect.width, 900 / rect.height);
-  const body = {
-    width: Math.max(200, Math.round(rect.width * scale)),
-    height: Math.max(110, Math.round(rect.height * scale)),
-    events: pending.splice(0, 96),
-  };
+function download(slot) {
   try {
-    const response = await fetch("/api/frame", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!response.ok) throw new Error(await response.text());
-    const bitmap = await createImageBitmap(await response.blob());
-    if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
-    if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
-    connecting.hidden = true;
+    const data = saveService.snapshot(slot);
+    const url = URL.createObjectURL(new Blob([data], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = slot == null ? "NGU-Current.txt" : slot === 0 ? "NGU-Autosave.txt" : "NGU-Slot-" + slot + ".txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    notice("Save exported.");
+  } catch (error) { notice(error.message); }
+}
+
+function fatal(message) {
+  console.error(message);
+  failure.textContent = message;
+  failure.hidden = false;
+  engine = null;
+  file.hidden = true;
+  gameText.hidden = true;
+}
+
+function applyResolution(width, height, fullscreen) {
+  resolution = fullscreen ? null : [width, height];
+  if (fullscreen && !document.fullscreenElement) {
+    surface.requestFullscreen?.().catch(() => {});
+  } else if (!fullscreen && document.fullscreenElement === surface) {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+function frame(now) {
+  if (!engine) return;
+  const dt = previousFrame == null ? 0 : (now - previousFrame) / 1000;
+  previousFrame = now;
+  pollGamepad(now);
+  const rect = canvas.getBoundingClientRect();
+  const [maxWidth, maxHeight] = resolution ?? [4096, 2160];
+  const scale = Math.min(window.devicePixelRatio || 1, maxWidth / rect.width, maxHeight / rect.height);
+  try {
+    engine.command(pending.splice(0, 96));
+    const info = engine.frame(Math.max(1, Math.round(rect.width * scale)), Math.max(1, Math.round(rect.height * scale)), dt);
+    frameInfo = info;
+    saveService.update(info, now);
     gotFrame = true;
-    showText(response.headers.get("X-NGU-Text"));
-    for (const sound of (response.headers.get("X-NGU-Sounds") || "").split(",")) {
+    showText(info.text);
+    file.hidden = !info.import;
+    if (info.import) place(file, info.import[1]);
+    if (info.file?.[0] === "import") file.click();
+    if (info.file?.[0] === "export") download(info.file[1]);
+    if (info.resolution) applyResolution(...info.resolution);
+    for (const sound of info.sounds) {
       if (sound === "Fart" || sound === "LongFart") {
         new Audio("/audio/" + sound + ".wav").play().catch(() => {});
       }
     }
+    requestAnimationFrame(frame);
   } catch (error) {
-    connecting.textContent = "Waiting for the game server…";
-    connecting.hidden = false;
-    status.textContent = error.message;
-    lastRequest += 900;
-  } finally {
-    inFlight = false;
+    fatal("The game stopped. Reload this page to continue.");
+    console.error(error);
   }
 }
 
-async function chooseImportSlot(save) {
-  if (!save) return;
-  if (!save.size || save.size > 16 * 1024 * 1024) {
-    status.textContent = "Choose a nonempty NGU Idle save smaller than 16 MB.";
-    file.value = "";
-    return;
-  }
-  const select = byId("import-slot");
-  select.replaceChildren();
-  try {
-    const response = await fetch("/api/slots");
-    if (!response.ok) throw new Error(await response.text());
-    for (const slot of await response.json()) {
-      if (!slot.occupied) select.add(new Option("Slot " + slot.number, slot.number));
-    }
-    if (!select.options.length) throw new Error("All slots are occupied. Free a slot in Create New Game before importing.");
-    selectedSave = save;
-    importDialog.returnValue = "cancel";
-    importDialog.showModal();
-  } catch (error) {
-    status.textContent = error.message;
-  } finally {
-    file.value = "";
-  }
+try {
+  const profile = await initialProfile();
+  engine = await boot(canvas, profile?.files ?? {}, profile?.modified);
+  saveService = saves(engine, profile, notice, () => fatal("The game stopped. Reload this page to continue."));
+  if (!profile) notice("Save server unavailable.");
+  canvas.focus({ preventScroll: true });
+  requestAnimationFrame(frame);
+} catch (error) {
+  fatal(error.message);
 }
-
-importDialog.addEventListener("close", async () => {
-  const save = selectedSave;
-  selectedSave = undefined;
-  if (!save || importDialog.returnValue !== "apply") return;
-  const slot = byId("import-slot").value;
-  status.textContent = "Importing save…";
-  try {
-    const headers = { "Content-Type": "application/octet-stream", "X-NGU-Filename": encodeURIComponent(save.name) };
-    const response = await fetch("/api/import/" + slot, { method: "POST", headers, body: save });
-    if (!response.ok) throw new Error(await response.text());
-    status.textContent = "Save imported into Slot " + slot + ". Open Load Game to play it.";
-  } catch (error) {
-    status.textContent = error.message;
-  }
-});
-byId("import").addEventListener("click", () => file.click());
-file.addEventListener("change", () => chooseImportSlot(file.files[0]));
-surface.addEventListener("dragenter", (event) => {
-  if (!event.dataTransfer.types.includes("Files")) return;
-  event.preventDefault();
-  dragDepth += 1;
-  byId("drop").hidden = false;
-});
-surface.addEventListener("dragover", (event) => {
-  if (event.dataTransfer.types.includes("Files")) event.preventDefault();
-});
-surface.addEventListener("dragleave", () => {
-  dragDepth = Math.max(0, dragDepth - 1);
-  byId("drop").hidden = dragDepth === 0;
-});
-surface.addEventListener("drop", (event) => {
-  event.preventDefault();
-  dragDepth = 0;
-  byId("drop").hidden = true;
-  chooseImportSlot(event.dataTransfer.files[0]);
-});
-byId("export").addEventListener("click", async () => {
-  const list = byId("export-list");
-  list.replaceChildren();
-  try {
-    const response = await fetch("/api/slots");
-    if (!response.ok) throw new Error(await response.text());
-    for (const slot of await response.json()) {
-      if (!slot.occupied) continue;
-      const entry = document.createElement("li");
-      const link = document.createElement("a");
-      link.href = "/api/slots/" + slot.number;
-      link.download = "NGU-Slot-" + slot.number + ".txt";
-      link.textContent = "Download Slot " + slot.number;
-      entry.append(link);
-      list.append(entry);
-    }
-    byId("export-help").hidden = list.childElementCount > 0;
-    exportDialog.showModal();
-  } catch (error) {
-    status.textContent = error.message;
-  }
-});
-byId("fullscreen").addEventListener("click", () => {
-  if (surface.requestFullscreen) surface.requestFullscreen().catch((error) => { status.textContent = error.message; });
-});
-if (!document.fullscreenEnabled) byId("fullscreen").hidden = true;
-requestAnimationFrame(frame);

@@ -18,5 +18,8 @@ crates/ngu-gen/src/ext_stubs.rs
 !nguidle-web/server.py
 !nguidle-web/entrypoint.sh
 !nguidle-web/snapshot.py
+!nguidle-web/pack_assets.py
+!nguidle-web/package.json
+!nguidle-web/package-lock.json
 !nguidle-web/public/
 !nguidle-web/public/**

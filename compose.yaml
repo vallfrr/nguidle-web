@@ -5,13 +5,11 @@ services:
       dockerfile: nguidle-web/Dockerfile
     init: true
     restart: unless-stopped
-    mem_limit: ${NGU_MEMORY_LIMIT:-14g}
-    memswap_limit: ${NGU_MEMORY_LIMIT:-14g}
+    mem_limit: ${NGU_MEMORY_LIMIT:-4g}
+    memswap_limit: ${NGU_MEMORY_LIMIT:-4g}
     ports:
       - "${NGU_BIND_ADDRESS:-127.0.0.1}:${NGU_PORT:-8080}:8080"
     environment:
-      NGU_CULTURE: en
-      NGU_LAYOUT: pc
       NGU_FETCH_MILESTONE_ICONS: "${NGU_FETCH_MILESTONE_ICONS:-1}"
     volumes:
       - type: bind

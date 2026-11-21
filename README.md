@@ -1,98 +1,102 @@
 # nguidle-web
 
-Self-hosted browser host for [nguidle-rust](https://github.com/vallfrr/nguidle-rust).
-The server runs the same converted Rust game and responsive UI as the desktop
-build. The browser sends input and displays frames rendered by that engine.
-The host serves one personal profile.
+Self-hosted browser port of [nguidle-rust](https://github.com/vallfrr/nguidle-rust).
+Each browser tab runs the shared Unity-compatible Rust engine and CIL
+interpreter in WebAssembly, with the desktop scene, UI and WebGL rendering.
+The server delivers the build and stores a personal save profile.
 
 ## Docker Compose
 
-1. Clone the Rust repository. Clone this repository into its `nguidle-web/`
-   directory so that `nguidle-web/compose.yaml` and the parent `Cargo.toml`
-   are in the same checkout.
-2. In `nguidle-web/`, copy `.env.example` to `.env` and set
-   `NGU_GAME_DATA` to the full path of your own Steam Windows 1.260
-   `NGUIdle_Data` directory. With Docker Desktop, use a path shared with
-   Docker such as `D:/Steam/steamapps/common/NGU IDLE/NGUIdle_Data`.
+1. Clone the Rust repository and clone this repository into its
+   `nguidle-web/` directory. Compose uses the parent Rust checkout as build context.
+2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to
+   the absolute path of your Steam Windows 1.260 `NGUIdle_Data` directory.
 3. Run `docker compose up --build` and open
-   [http://localhost:8080](http://localhost:8080) after the service starts.
+   [http://localhost:8080](http://localhost:8080) when the service is healthy.
 
-The container mounts your original directory read-only and verifies every
-required file against the Rust repository's SHA-256 manifest before
-conversion. If the files are missing or differ, it waits and retries. Once
-they match, it verifies a private copy, extracts the game and compiles the
-Rust worker. The first compilation can take several minutes and may require
-more than 10 GB of RAM. Follow progress with `docker compose logs -f game`.
-Set `NGU_FETCH_MILESTONE_ICONS=0` to skip downloading Steam milestone
-icons. The game shows milestone names when an icon is unavailable.
+The container checks 115 SHA-256 hashes on the read-only game mount,
+validates a private snapshot, extracts the assets and builds the WebAssembly
+module. It waits if the installation is incomplete or unsupported. Follow
+progress with `docker compose logs -f game`.
 
-The `build-cache` volume holds generated files and compiled code. The
-`saves` volume holds your profile separately. Back up the `saves` volume
-before changing machines or removing Docker volumes.
+The `build-cache` volume contains generated files. The `saves` volume
+contains the SQLite profile. Back up the saves volume while the container is
+stopped, or export individual saves in the game. Set
+`NGU_FETCH_MILESTONE_ICONS=0` to skip the optional icon downloads. Achievement
+names and conditions remain available.
 
 ## Local Windows preview
 
-The Rust workspace must contain the web worker. Build and prepare your
-installation with the instructions in the parent README, then start the host
-from PowerShell in this directory.
+Install Python, npm and Rust, add the `wasm32-wasip1` target with Rustup,
+and extract your assets following the parent project's instructions.
 
 ```powershell
-.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data' `
-  -Engine '..\build\pc\game\ngu-gen.exe' -Assets '..\out\pc'
+rustup target add wasm32-wasip1
+.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data' -Assets '..\out\pc'
 ```
 
-The native preview uses `out/profile` in this repository for its own saves
-by default. Point `-Save` at a directory dedicated to the web host.
+The launcher uses a separate `out/profile` directory by default. Use
+`-Runtime` for an existing WASM build and `-Save` to choose a different
+profile. To migrate numbered saves from an earlier web profile, point
+`-Save` there. On its first start SQLite imports those saves and preserves
+the original files.
 
-## Controls and saves
+## Play and manage saves
 
-- Mouse and touchscreen use the game canvas for clicks, drags, and scrolling.
-  Click the canvas before using the keyboard. **F1** switches between
-  game shortcuts and keyboard focus navigation.
-- A browser that exposes a standard gamepad uses the D-pad or left stick
-  for focus, the south button to activate, the east button to go back,
-  the shoulders to change menu, and the right stick to scroll.
-- Use the five in-game slots and **Load Autosave** as on desktop. The
-  browser toolbar imports a `.txt` save into an empty slot using the file
-  picker or drag-and-drop. **Export save** downloads a numbered slot.
-- The game runs on the host while a session is active, including when the
-  browser tab is hidden. The slots are shared between your devices that use
-  the same host. More than one open tab controls the same live game.
+- Play in landscape on phones. Touch uses the same scene and pointer path
+  for taps and drags. A second finger during a tap sends a secondary click.
+  The resolution choices limit rendering resolution in the browser viewport.
+  On a computer, click the game to give it keyboard
+  focus. F1 switches between game shortcuts and focus navigation.
+- The D-pad or left stick moves focus on standard gamepads. The south
+  button activates, the east button goes back, the shoulders change menus,
+  and the right stick scrolls.
+- **Create New Game** asks for a numbered slot. **Load Autosave** opens the
+  last server autosave. In **Load Game**, select an empty slot to use
+  **Import Save File** or drop a save onto the game. Select a filled slot
+  to use **Export Save**.
+- **Save Game → Export Current Game** downloads live progress during
+  gameplay, including during a connection outage. During an outage the
+  game keeps running in the browser and shows **Save server unavailable**
+  in the autosave area. Opening a saved game requires the save server.
+- The active game autosaves about every 30 seconds. A slot in use is
+  disabled on other devices. Save before returning to the main menu or
+  closing the page. An unreleased lock becomes available after two minutes.
+  If another device takes the slot during an outage, export current progress
+  before reloading.
+  The shared engine calculates offline progress when opening a save.
 
-## LAN and reverse proxy
+## LAN and personal reverse proxy
 
-The default binding is localhost. For a trusted LAN or Tailscale network,
-set `NGU_BIND_ADDRESS` (or `-BindAddress` for the native preview) to the
-host address you want to use. The application exposes the personal game and
-its saves to clients that can reach this port.
-
-For a personal domain, use your own Nginx TLS and access controls. Keep the
-game bound to localhost when Nginx runs on the host, or keep the game on a
-private Docker network when Nginx runs in Docker. Preserve the incoming
-`Host` header and set `client_max_body_size 16m` for save uploads.
+For trusted LAN or Tailscale access, set `NGU_BIND_ADDRESS` (or
+`-BindAddress` in the launcher) to the interface address. Clients that can
+reach the service share the personal profile. For a personal domain,
+configure TLS and access control in Nginx and preserve the incoming Host.
 
 ```nginx
 location / {
-    client_max_body_size 16m;
+    client_max_body_size 33m;
     proxy_pass http://127.0.0.1:8080;
     proxy_set_header Host $http_host;
-    proxy_read_timeout 60s;
 }
 ```
 
-The application has no account system. Use an authenticated reverse proxy
-or private network for access from outside your machine.
+## Verification
 
-## First preview verification
+Run the standalone save service tests with
+`python -m unittest discover -s tests -v`. They use temporary profiles in
+`out/`. For the browser check, install Playwright and Chromium, start a
+separate host with an empty profile, and supply a compatible save fixture.
 
-Chromium on Windows verified game creation, server autosave, slot import
-and export, keyboard focus, a simulated gamepad event, and a landscape
-touchscreen viewport. A Linux worker rendered a frame in WSL using freshly
-extracted data. The Compose configuration and preparation steps were
-checked separately. The full Docker lifecycle and a live Nginx deployment
-still need testing on their target hosts.
+```sh
+python tests/browser_smoke.py --url http://127.0.0.1:8081 --fixture /path/to/save.txt
+```
+
+The acceptance test exercises named creation, in-game import, offline
+export, server writes, timed autosave, and a handoff to a landscape touch
+viewport. It writes screenshots under `out/verify-browser/`.
 
 ## License
 
-GPL-3.0. Game data is supplied by the person running the host and stays
-outside the repository.
+GPL-3.0. Supply the game data from your own installation. Game data and
+saves stay outside the repository.
