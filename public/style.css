@@ -1,0 +1,48 @@
+:root {
+  color-scheme: dark;
+  font: 15px system-ui, sans-serif;
+  background: #11181e;
+  color: #eff5f9;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+#shell { display: flex; flex-direction: column; min-height: 100dvh; }
+header {
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: .5rem max(env(safe-area-inset-right), .7rem) .5rem max(env(safe-area-inset-left), .7rem);
+  gap: .5rem;
+  background: #1b2730;
+}
+.actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+button {
+  border: 1px solid #586d7e;
+  border-radius: 4px;
+  background: #2d4354;
+  color: inherit;
+  font: inherit;
+  padding: .38rem .62rem;
+  cursor: pointer;
+}
+button:hover, button:focus-visible { background: #3d5b71; }
+a { color: #9ed1f6; }
+#surface { position: relative; flex: 1; display: grid; place-items: center; background: #000; }
+canvas { width: 100%; height: min(calc(100dvh - 5rem), 56.25vw); display: block; touch-action: none; }
+#surface:fullscreen canvas { height: 100dvh; }
+#connecting, #drop {
+  position: absolute;
+  inset: auto;
+  margin: 0;
+  padding: .75rem 1rem;
+  background: #1b2730;
+  border: 1px solid #586d7e;
+  pointer-events: none;
+}
+#status { min-height: 2rem; padding: .35rem .7rem; overflow-wrap: anywhere; }
+dialog { width: min(24rem, calc(100vw - 2rem)); padding: 1rem; border: 1px solid #586d7e; background: #1b2730; }
+dialog menu { display: flex; justify-content: end; gap: .5rem; padding: 0; margin-bottom: 0; }
+dialog input { width: 100%; font: inherit; margin-top: .5rem; padding: .5rem; }
+dialog::backdrop { background: #11181eb3; }

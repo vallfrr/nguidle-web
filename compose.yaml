@@ -1,0 +1,34 @@
+services:
+  game:
+    build:
+      context: ..
+      dockerfile: nguidle-web/Dockerfile
+    init: true
+    restart: unless-stopped
+    mem_limit: ${NGU_MEMORY_LIMIT:-14g}
+    memswap_limit: ${NGU_MEMORY_LIMIT:-14g}
+    ports:
+      - "${NGU_BIND_ADDRESS:-127.0.0.1}:${NGU_PORT:-8080}:8080"
+    environment:
+      NGU_CULTURE: en
+      NGU_LAYOUT: pc
+      NGU_FETCH_MILESTONE_ICONS: "${NGU_FETCH_MILESTONE_ICONS:-1}"
+    volumes:
+      - type: bind
+        source: "${NGU_GAME_DATA:?Set NGU_GAME_DATA to your NGUIdle_Data directory}"
+        target: /game-data
+        read_only: true
+        bind:
+          create_host_path: false
+      - build-cache:/work
+      - saves:/profile
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).close()"]
+      interval: 15s
+      timeout: 4s
+      retries: 3
+      start_period: 15m
+
+volumes:
+  build-cache:
+  saves:
