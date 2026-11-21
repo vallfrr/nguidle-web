@@ -45,6 +45,8 @@ the original files.
 
 - Play in landscape on phones. Touch uses the same scene and pointer path
   for taps and drags. A second finger during a tap sends a secondary click.
+  Hold a finger in place to read the game's tooltip. Lift to keep it open,
+  then tap elsewhere to dismiss it.
   The resolution choices limit rendering resolution in the browser viewport.
   On a computer, click the game to give it keyboard
   focus. F1 switches between game shortcuts and focus navigation.
@@ -95,6 +97,8 @@ python tests/browser_smoke.py --url http://127.0.0.1:8081 --fixture /path/to/sav
 The acceptance test exercises named creation, in-game import, offline
 export, server writes, timed autosave, and a handoff to a landscape touch
 viewport. It writes screenshots under `out/verify-browser/`.
+Run `tests/browser_hover.py` against an isolated server using a runtime
+compiled with `-p ngu-browser --features audit` and an unlocked save fixture.
 
 ## License
 

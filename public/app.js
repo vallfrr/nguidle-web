@@ -9,6 +9,7 @@ const failure = byId("failure");
 const file = byId("save-file");
 
 const gameText = byId("game-text");
+const hoverHoldMs = 450;
 
 
 let pickerSlot;
@@ -25,6 +26,7 @@ let waitingForTextClose = false;
 
 
 function enqueue(event) {
+  if (event.type === "navigate" || event.type === "scroll") mousePosition = undefined;
   const last = pending.at(-1);
   if (event.type === "move" && last?.type === "move") pending.pop();
   if (event.type === "scroll" && last?.type === "scroll") {
@@ -41,6 +43,14 @@ function point(event) {
 }
 
 let touch;
+let mousePosition;
+let lastBounds;
+
+function moveMouse(event) {
+  mousePosition = { clientX: event.clientX, clientY: event.clientY };
+  enqueue({ type: "move", ...point(mousePosition) });
+}
+
 canvas.addEventListener("pointerdown", (event) => {
   if (!event.isPrimary) {
     if (event.pointerType === "touch" && touch && !touch.dragging) touch.secondary = true;
@@ -50,9 +60,11 @@ canvas.addEventListener("pointerdown", (event) => {
   canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(event.pointerId);
   if (event.pointerType === "touch") {
-    touch = { start: point(event), x: event.clientX, y: event.clientY, dragging: false, secondary: false };
-    enqueue({ type: "move", ...touch.start });
+    mousePosition = undefined;
+    touch = { start: point(event), x: event.clientX, y: event.clientY, started: event.timeStamp, dragging: false, secondary: false };
+    enqueue({ type: "move", x: -1, y: -1 });
   } else {
+    mousePosition = { clientX: event.clientX, clientY: event.clientY };
     enqueue({ type: "button", ...point(event), button: event.button, down: true });
   }
   event.preventDefault();
@@ -63,12 +75,19 @@ canvas.addEventListener("pointermove", (event) => {
     touch.dragging = true;
     enqueue({ type: "button", ...touch.start, button: 0, down: true });
   }
-  enqueue({ type: "move", ...point(event) });
+  if (event.pointerType !== "touch") moveMouse(event);
+  else if (touch?.dragging) enqueue({ type: "move", ...point(event) });
 });
 canvas.addEventListener("pointerup", (event) => {
   if (event.isPrimary && gotFrame) {
     if (event.pointerType === "touch" && touch) {
+      const inspecting = touch.inspecting || event.timeStamp - touch.started >= hoverHoldMs;
       const button = touch.secondary ? 2 : 0;
+      if (inspecting && !touch.dragging && !touch.secondary) {
+        enqueue({ type: "move", ...touch.start });
+        touch = undefined;
+        return;
+      }
       if (!touch.dragging) enqueue({ type: "button", ...touch.start, button, down: true });
       enqueue({ type: "button", ...point(event), button, down: false });
       touch = undefined;
@@ -84,8 +103,11 @@ canvas.addEventListener("pointercancel", (event) => {
     enqueue({ type: "reset" });
   }
 });
-canvas.addEventListener("pointerleave", (event) => {
-  if (!canvas.hasPointerCapture(event.pointerId)) enqueue({ type: "move", x: -1, y: -1 });
+surface.addEventListener("pointerleave", (event) => {
+  if (event.pointerType !== "touch" && !canvas.hasPointerCapture(event.pointerId)) {
+    mousePosition = undefined;
+    enqueue({ type: "move", x: -1, y: -1 });
+  }
 });
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener("wheel", (event) => {
@@ -119,6 +141,7 @@ canvas.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => {
   touch = undefined;
+  mousePosition = undefined;
   heldKeys.clear();
   enqueue({ type: "reset" });
 });
@@ -227,7 +250,7 @@ file.addEventListener("change", () => {
   file.value = "";
 });
 file.addEventListener("pointermove", event => {
-  if (event.pointerType === "mouse") enqueue({ type: "move", ...point(event) });
+  if (event.pointerType === "mouse") moveMouse(event);
 });
 surface.addEventListener("dragover", event => {
   if (event.dataTransfer.types.includes("Files")) event.preventDefault();
@@ -276,6 +299,15 @@ function frame(now) {
   previousFrame = now;
   pollGamepad(now);
   const rect = canvas.getBoundingClientRect();
+  const bounds = [rect.left, rect.top, rect.width, rect.height];
+  if (mousePosition && bounds.some((value, i) => value !== lastBounds?.[i])) {
+    enqueue({ type: "move", ...point(mousePosition) });
+  }
+  lastBounds = bounds;
+  if (touch && !touch.inspecting && !touch.dragging && !touch.secondary && now - touch.started >= hoverHoldMs) {
+    touch.inspecting = true;
+    enqueue({ type: "move", ...touch.start });
+  }
   const [maxWidth, maxHeight] = resolution ?? [4096, 2160];
   const scale = Math.min(window.devicePixelRatio || 1, maxWidth / rect.width, maxHeight / rect.height);
   try {
