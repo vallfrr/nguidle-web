@@ -38,4 +38,19 @@ jobs:
           python -m pip install ruff==0.11.13
           cargo +1.100.0 install --locked --version 1.43.0 just
       - name: Run the local checks
-        run: just check
+        env:
+          NGU_ENGINE_READ_KEY: ${{ secrets.NGU_ENGINE_READ_KEY }}
+        run: |
+          if [ -n "$NGU_ENGINE_READ_KEY" ]; then
+            key_dir=$(mktemp -d)
+            trap 'rm -f "$key_dir/key" "$key_dir/known_hosts"; rmdir "$key_dir"' EXIT
+            (umask 077; printf '%s\n' "$NGU_ENGINE_READ_KEY" > "$key_dir/key")
+            printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$key_dir/known_hosts"
+            export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o UserKnownHostsFile=$key_dir/known_hosts -i $key_dir/key"
+            export GIT_CONFIG_COUNT=1
+            export GIT_CONFIG_KEY_0=url.ssh://git@github.com/vallfrr/nguidle-rust.git.insteadOf
+            export GIT_CONFIG_VALUE_0=https://github.com/vallfrr/nguidle-rust.git
+            export CARGO_NET_GIT_FETCH_WITH_CLI=true
+          fi
+          unset NGU_ENGINE_READ_KEY
+          just check
