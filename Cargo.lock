@@ -106,7 +106,7 @@ dependencies = [
 [[package]]
 name = "clr"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.1.0#41db0c70f07b8fa76e9cc7e18b278736ab32dbd9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.2.0#b7f62b74cdb27c725638dd18ad8a7a12ee598a57"
 dependencies = [
  "aes",
  "dotnetdll",
@@ -415,7 +415,7 @@ dependencies = [
 [[package]]
 name = "ngu-rt"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.1.0#41db0c70f07b8fa76e9cc7e18b278736ab32dbd9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.2.0#b7f62b74cdb27c725638dd18ad8a7a12ee598a57"
 
 [[package]]
 name = "num-derive"

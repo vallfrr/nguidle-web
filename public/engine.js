@@ -80,7 +80,8 @@ export async function boot(canvas, profile, modified = {}) {
       const address = exports.web_input(data.length);
       new Uint8Array(exports.memory.buffer, address, data.length).set(data);
       const length = exports.web_command();
-      return length ? output(length) : [];
+      if (!length) throw new Error("The browser engine returned no command response.");
+      return output(length);
     },
     frame(width, height, dt) {
       if (canvas.width !== width) canvas.width = width;
@@ -157,6 +158,7 @@ function renderer(canvas, engine) {
       const [width, height] = address ? dims : [1, 1];
       const pixels = address ? new Uint8Array(engine.memory.buffer, address, width * height * 4) : new Uint8Array([255,255,255,255]);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      if (address && id > 1) engine.web_texture_release?.(id);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       item.width = width;

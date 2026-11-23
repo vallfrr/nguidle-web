@@ -115,10 +115,13 @@ canvas.addEventListener("wheel", (event) => {
   enqueue({ type: "wheel", ...point(event), delta: -event.deltaY / unit });
   event.preventDefault();
 }, { passive: false });
-canvas.addEventListener("blur", () => enqueue({ type: "reset" }));
+const heldKeys = new Map();
+canvas.addEventListener("blur", () => {
+  heldKeys.clear();
+  enqueue({ type: "reset" });
+});
 
 const directions = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "activate", " ": "activate", Escape: "back" };
-const heldKeys = new Set();
 canvas.addEventListener("keydown", (event) => {
   if (event.key === "F1" && !event.repeat) {
     keyboardFocus = !keyboardFocus;
@@ -132,12 +135,14 @@ canvas.addEventListener("keydown", (event) => {
   }
   if (event.key === "Tab" || event.key.startsWith("F") && event.key.length > 1) return;
   if (event.ctrlKey && event.key !== "Control") return;
-  heldKeys.add(event.code);
-  enqueue({ type: "key", key: event.key, right: event.location === 2, down: true, repeat: event.repeat });
+  const key = heldKeys.get(event.code) ?? { key: event.key, right: event.location === 2 };
+  heldKeys.set(event.code, key);
+  enqueue({ type: "key", ...key, down: true, repeat: event.repeat });
   if (directions[event.key]) event.preventDefault();
 });
-canvas.addEventListener("keyup", (event) => {
-  if (heldKeys.delete(event.code)) enqueue({ type: "key", key: event.key, right: event.location === 2, down: false, repeat: false });
+window.addEventListener("keyup", (event) => {
+  const key = heldKeys.get(event.code);
+  if (heldKeys.delete(event.code)) enqueue({ type: "key", ...key, down: false, repeat: false });
 });
 window.addEventListener("blur", () => {
   touch = undefined;
@@ -311,7 +316,11 @@ function frame(now) {
   const [maxWidth, maxHeight] = resolution ?? [4096, 2160];
   const scale = Math.min(window.devicePixelRatio || 1, maxWidth / rect.width, maxHeight / rect.height);
   try {
-    engine.command(pending.splice(0, 96));
+    const rejected = engine.command(pending.splice(0, 96)).filter(reply => reply.error);
+    if (rejected.length) {
+      console.warn("Browser input rejected", rejected);
+      notice(rejected[0].error);
+    }
     const info = engine.frame(Math.max(1, Math.round(rect.width * scale)), Math.max(1, Math.round(rect.height * scale)), dt);
     frameInfo = info;
     saveService.update(info, now);

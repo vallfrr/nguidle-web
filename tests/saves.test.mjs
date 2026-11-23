@@ -12,10 +12,11 @@ const profile = (overrides = {}) => ({
   files: {}, locked: [], modified: {}, revisions: {}, version: 1, ...overrides,
 });
 
-async function fixture(routes = {}, initial = profile(), createOnGrant = false) {
+async function fixture(routes = {}, initial = profile(), createOnGrant = false, leaseReply = [{}]) {
   const requests = [];
   const routeErrors = [];
   const commands = [];
+  const notices = [];
   const events = new Map();
   const disk = new Map();
   let now = 0;
@@ -61,13 +62,14 @@ async function fixture(routes = {}, initial = profile(), createOnGrant = false) 
       if (createOnGrant && command.type === "lease" && command.granted) {
         disk.set(slots[0], "new save");
       }
+      if (command.type === "lease") return leaseReply;
       if (command.type === "export") return [{ save: "live save" }];
       return [{}];
     },
   };
-  const client = module.namespace.saves(engine, initial, () => {}, () => assert.fail("game stopped"));
+  const client = module.namespace.saves(engine, initial, message => notices.push(message), () => assert.fail("game stopped"));
   return {
-    client, requests, commands, events, initialProfile: module.namespace.initialProfile,
+    client, requests, commands, events, notices, initialProfile: module.namespace.initialProfile,
     async frame(meta, time) {
       now = time;
       client.update(meta, time);
@@ -93,6 +95,17 @@ test("claims an empty slot before writing it and releases it on page exit", asyn
     assert.equal(request.slot, 1);
     assert.equal(request.owner, scenario.requests[0][1].owner);
   }
+});
+
+test("releases the server lock when the engine does not acknowledge the slot", async () => {
+  const scenario = await fixture({
+    claim: () => profile({ locked: [1] }),
+    release: () => profile(),
+  }, profile(), false, []);
+  await scenario.frame({ request: 1, active: null, home: true }, 0);
+  assert.deepEqual(scenario.requests.map(([action]) => action), ["claim", "release"]);
+  assert.ok(scenario.commands.some(command => command.type === "lease" && !command.granted));
+  assert.match(scenario.notices[0], /did not acknowledge/);
 });
 
 test("renews the lease before sending an autosave", async () => {
