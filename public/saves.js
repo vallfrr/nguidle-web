@@ -113,7 +113,7 @@ export function saves(engine, initial, indicate, stop) {
       claimed = true;
       result(next, true);
       const [reply] = engine.command([{ type: "lease", granted: true }]);
-      if (reply?.error) throw new Error(reply.error);
+      if (!reply || reply.error) throw new Error(reply?.error ?? "The browser engine did not acknowledge the save slot.");
       held = slot;
       active = slot;
       renewAt = performance.now() + 20_000;
@@ -121,7 +121,7 @@ export function saves(engine, initial, indicate, stop) {
       await write(diff());
       if (before != null && before !== slot) await api("release", { slot: before });
     } catch (error) {
-      if (claimed && held !== slot) api("release", { slot }).catch(() => {});
+      if (claimed && held !== slot) await api("release", { slot }).catch(() => {});
       if (error instanceof WebAssembly.RuntimeError) throw error;
       engine.command([{ type: "lease", granted: false }]);
       if (!error.status && !(error instanceof TypeError) && error.name !== "TimeoutError") indicate(error.message);

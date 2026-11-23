@@ -6,4 +6,4 @@
 
 Shared guides are maintained in [nguidle-rust](https://github.com/vallfrr/nguidle-rust/tree/main/.claude/skills).
 
-To evaluate when the web version starts: a Rust -> WebAssembly skill (`wasm-bindgen`/`wasm-pack`; several community versions on skills.sh / skillsdirectory, quality unchecked), and `vite-patterns` / `frontend-a11y` from [everything-claude-code](https://github.com/affaan-m/everything-claude-code).
+The [web README](../../README.md) documents the WASI build, browser startup, and checks.

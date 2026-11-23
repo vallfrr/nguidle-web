@@ -1,5 +1,5 @@
 //! Browser WASI reactor. The engine runs entirely inside the browser.
-#![cfg(target_arch = "wasm32")]
+#![cfg(any(target_arch = "wasm32", test))]
 
 use clr::{
     focus,
@@ -7,12 +7,14 @@ use clr::{
     unity_api, Vm,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{json, value::RawValue, Value};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
 const STEP: f32 = 1.0 / 30.0;
 const HEIGHT: f32 = 600.0;
+// Ignore legacy resolution requests during the first 120 engine frames.
+const STARTUP_RESOLUTION_GUARD_FRAMES: u64 = 120;
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -212,21 +214,26 @@ pub extern "C" fn web_input(size: usize) -> usize {
 #[no_mangle]
 pub extern "C" fn web_command() -> usize {
     INPUT.with(|input| {
-        if let Ok(events) = serde_json::from_slice::<Vec<Event>>(&input.borrow()) {
-            state(|s| {
-                let mut results = vec![];
-                for event in events {
-                    if let Some(result) = s.event(event) {
-                        results.push(result);
-                    }
-                }
-                s.output = serde_json::to_vec(&results).unwrap();
-                s.output.len()
-            })
-        } else {
-            0
-        }
+        state(|s| {
+            let results = command_results(&input.borrow(), |event| s.event(event));
+            s.output = serde_json::to_vec(&results).unwrap();
+            s.output.len()
+        })
     })
+}
+
+fn command_results(input: &[u8], mut dispatch: impl FnMut(Event) -> Option<Value>) -> Vec<Value> {
+    let Ok(events) = serde_json::from_slice::<Vec<&RawValue>>(input) else {
+        return vec![json!({"error": "Invalid browser command batch."})];
+    };
+    events
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, raw)| match serde_json::from_str(raw.get()) {
+            Ok(event) => dispatch(event),
+            Err(_) => Some(json!({"error": "Invalid browser event.", "event": index})),
+        })
+        .collect()
 }
 
 #[no_mangle]
@@ -306,7 +313,7 @@ pub extern "C" fn web_frame(width: u32, height: u32, seconds: f32) -> usize {
                 .resolution_req
                 .take()
                 .and_then(|(width, height, fullscreen, at)| {
-                    if at <= 120 {
+                    if at <= STARTUP_RESOLUTION_GUARD_FRAMES {
                         return None;
                     }
                     let (width, height) = clr::desktop_layout::pc_resolution(width, height);
@@ -359,6 +366,11 @@ pub extern "C" fn web_texture(id: u32) -> usize {
         TEX_SIZE.with(|size| *size.borrow_mut() = [width as u32, height as u32]);
         ptr as usize
     })
+}
+
+#[no_mangle]
+pub extern "C" fn web_texture_release(id: u32) {
+    state(|s| s.renderer.tex_release(id));
 }
 
 #[no_mangle]
@@ -426,16 +438,10 @@ impl State {
                 right,
                 down,
                 repeat,
-            } if self.vm.eng.text_req.is_none() => {
+            } => {
                 let code = key_code(&key, right);
-                if code != 0 && down {
-                    self.vm.eng.keys_down.insert(code);
-                    if !repeat {
-                        self.vm.eng.keys_edge.insert(code);
-                    }
-                } else {
-                    self.vm.eng.keys_down.remove(&code);
-                }
+                let text_open = self.vm.eng.text_req.is_some();
+                update_key(&mut self.vm.eng, code, down, repeat, text_open);
             }
             Event::Navigate { action } if self.vm.eng.text_req.is_none() => self.navigate(&action),
             Event::Scroll { x, y } => {
@@ -554,6 +560,67 @@ impl State {
                 down: false,
             });
         }
+    }
+}
+
+fn update_key(
+    engine: &mut clr::unity::Engine,
+    code: i32,
+    down: bool,
+    repeat: bool,
+    text_open: bool,
+) {
+    if !down {
+        engine.keys_down.remove(&code);
+    } else if code != 0 && !text_open {
+        engine.keys_down.insert(code);
+        if !repeat {
+            engine.keys_edge.insert(code);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_event_does_not_discard_adjacent_events() {
+        let mut positions = Vec::new();
+        let replies = command_results(
+            br#"[{"type":"move","x":0.25,"y":0.5},{"type":"move"},{"type":"move","x":0.75,"y":0.5}]"#,
+            |event| {
+                if let Event::Move { x, y } = event {
+                    positions.push((x, y));
+                }
+                None
+            },
+        );
+        assert_eq!(positions, [(0.25, 0.5), (0.75, 0.5)]);
+        assert_eq!(
+            replies,
+            [json!({"error": "Invalid browser event.", "event": 1})]
+        );
+    }
+
+    #[test]
+    fn malformed_batch_returns_an_error() {
+        let replies = command_results(b"[", |_| panic!("unexpected event"));
+        assert_eq!(
+            replies,
+            [json!({"error": "Invalid browser command batch."})]
+        );
+    }
+
+    #[test]
+    fn key_release_is_delivered_while_typing() {
+        let mut engine = clr::unity::Engine::default();
+        update_key(&mut engine, 275, true, false, false);
+        assert!(engine.keys_down.contains(&275));
+        update_key(&mut engine, 275, false, false, true);
+        update_key(&mut engine, 276, true, false, true);
+        assert!(engine.keys_down.is_empty());
+        assert!(!engine.keys_edge.contains(&276));
     }
 }
 

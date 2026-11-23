@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Keep valid browser events when an adjacent event is invalid, release held keys during text entry, and reject unacknowledged save locks.
+- Release decoded texture pixels after the WebGL upload and use engine tag `v0.2.0`.
+
 - Add local and GitHub checks for the WASM build and save-client behavior.
 
 ## [0.1.0]

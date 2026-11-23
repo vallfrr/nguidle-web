@@ -7,7 +7,7 @@ The server delivers the build and stores a personal save profile.
 
 ## Docker Compose
 
-1. Clone this repository. Cargo fetches engine tag `v0.1.0` at the revision
+1. Clone this repository. Cargo fetches engine tag `v0.2.0` at the revision
    committed in `Cargo.lock`. The image build fetches and checks the matching
    engine data-preparation scripts.
 2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to
@@ -107,6 +107,11 @@ export, server writes, timed autosave, and a handoff to a landscape touch
 viewport. It writes screenshots under `out/verify-browser/`.
 Run `tests/browser_hover.py` against an isolated server using a runtime
 compiled with `-p ngu-browser --features audit` and an unlocked save fixture.
+
+The browser's in-memory save files use timestamp hooks in `public/engine.js`.
+They wrap `stat()` and `fd_pwrite()` from the pinned `@bjorn3/browser_wasi_shim`
+dependency. When changing that version, rerun the browser save flow and
+verify that both existing timestamps and newly written ones reach the game.
 
 ## License
 

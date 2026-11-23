@@ -7,6 +7,7 @@ check:
     {{python}} -B engine.py
     cargo clippy --locked --target wasm32-wasip1 --no-deps -- --cap-lints warn
     cargo build --locked --release --target wasm32-wasip1
+    cargo test --locked --lib
     {{python}} -B -m ruff check --select E9,F63,F7,F82 .github/repo-check.py engine.py pack_assets.py server.py snapshot.py tests
     {{python}} -B -m unittest discover -s tests
     node --check public/app.js
