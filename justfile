@@ -1,3 +1,5 @@
+set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command"]
+
 python := if os() == "windows" { "python" } else { "python3" }
 
 check:
