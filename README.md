@@ -34,7 +34,8 @@ prepared data if you already have them. The toolchain file selects the
 required WebAssembly target.
 
 ```powershell
-.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data'
+$gameData = Read-Host 'Path to NGUIdle_Data'
+.\start-local.ps1 -GameData $gameData
 ```
 
 The launcher builds to `build/wasm` and packages to `work/prepared/web`
@@ -89,10 +90,12 @@ location / {
 
 ## Verification
 
-Run the standalone save service tests with
-`just check` to verify the engine pin, compile-check WebAssembly and test
-the save service. The service tests use temporary profiles in
-`out/`. For the browser check, install Playwright and Chromium, start a
+Install Just 1.43.0, Python 3.11 or later, Node.js 22 and Rustup. Install
+Ruff with `python -m pip install ruff==0.11.13`. Run `just check` to
+verify the engine pin, build WebAssembly and test both the save server
+and the client lease behavior. The tests use synthetic data and do not
+need the Steam installation. The service tests use temporary profiles in
+`out/`. For the separate browser check, install Playwright and Chromium, start a
 separate host with an empty profile, and supply a compatible save fixture.
 
 ```sh
