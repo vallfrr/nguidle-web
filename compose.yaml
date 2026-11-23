@@ -1,8 +1,6 @@
 services:
   game:
-    build:
-      context: ..
-      dockerfile: nguidle-web/Dockerfile
+    build: .
     init: true
     restart: unless-stopped
     mem_limit: ${NGU_MEMORY_LIMIT:-4g}

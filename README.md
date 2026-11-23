@@ -7,8 +7,9 @@ The server delivers the build and stores a personal save profile.
 
 ## Docker Compose
 
-1. Clone the Rust repository and clone this repository into its
-   `nguidle-web/` directory. Compose uses the parent Rust checkout as build context.
+1. Clone this repository. Cargo fetches engine tag `v0.1.0` at the revision
+   committed in `Cargo.lock`. The image build fetches and checks the matching
+   engine data-preparation scripts.
 2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to
    the absolute path of your Steam Windows 1.260 `NGUIdle_Data` directory.
 3. Run `docker compose up --build` and open
@@ -27,16 +28,20 @@ names and conditions remain available.
 
 ## Local Windows preview
 
-Install Python, npm and Rust, add the `wasm32-wasip1` target with Rustup,
-and extract your assets following the parent project's instructions.
+Install Python 3.11 or later, npm, Git and Rustup. The launcher prepares the
+assets from the game installation. Use `-Assets` to reuse compatible
+prepared data if you already have them. The toolchain file selects the
+required WebAssembly target.
 
 ```powershell
-rustup target add wasm32-wasip1
-.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data' -Assets '..\out\pc'
+$gameData = Read-Host 'Path to NGUIdle_Data'
+.\start-local.ps1 -GameData $gameData
 ```
 
-The launcher uses a separate `out/profile` directory by default. Use
-`-Runtime` for an existing WASM build and `-Save` to choose a different
+The launcher builds to `build/wasm` and packages to `work/prepared/web`
+in the workspace. New profiles go under `work/saves/web`. The launcher
+automatically reuses an existing `out/profile`. Use `-Runtime` for an
+existing WASM build and `-Save` to choose a different
 profile. To migrate numbered saves from an earlier web profile, point
 `-Save` there. On its first start SQLite imports those saves and preserves
 the original files.
@@ -85,9 +90,12 @@ location / {
 
 ## Verification
 
-Run the standalone save service tests with
-`python -m unittest discover -s tests -v`. They use temporary profiles in
-`out/`. For the browser check, install Playwright and Chromium, start a
+Install Just 1.43.0, Python 3.11 or later, Node.js 22 and Rustup. Install
+Ruff with `python -m pip install ruff==0.11.13`. Run `just check` to
+verify the engine pin, build WebAssembly and test both the save server
+and the client lease behavior. The tests use synthetic data and do not
+need the Steam installation. The service tests use temporary profiles in
+`out/`. For the separate browser check, install Playwright and Chromium, start a
 separate host with an empty profile, and supply a compatible save fixture.
 
 ```sh
