@@ -7,11 +7,9 @@ The server delivers the build and stores a personal save profile.
 
 ## Docker Compose
 
-1. Clone this repository and the Rust repository side by side, as
-   `nguidle-web/` and `nguidle-rust/`. Use Docker Compose 2.17 or later
-   with a builder that supports
-   [additional contexts](https://docs.docker.com/reference/compose-file/build/#additional_contexts).
-   Set `NGUIDLE_RUST` in `.env` for a different engine checkout.
+1. Clone this repository. Cargo fetches engine tag `v0.1.0` at the revision
+   committed in `Cargo.lock`. The image build fetches and checks the matching
+   engine data-preparation scripts.
 2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to
    the absolute path of your Steam Windows 1.260 `NGUIdle_Data` directory.
 3. Run `docker compose up --build` and open
@@ -30,12 +28,13 @@ names and conditions remain available.
 
 ## Local Windows preview
 
-Install Python, npm and Rust. Follow the engine's `CONTRIBUTING.md` to prepare
-the PC assets, then add the `wasm32-wasip1` target for its pinned toolchain.
+Install Python 3.11 or later, npm, Git and Rustup. The launcher prepares the
+assets from the game installation. Use `-Assets` to reuse compatible
+prepared data if you already have them. The toolchain file selects the
+required WebAssembly target.
 
 ```powershell
-rustup target add wasm32-wasip1 --toolchain 1.100.0
-.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data' -Assets '..\..\work\prepared\pc'
+.\start-local.ps1 -GameData 'D:\Steam\steamapps\common\NGU IDLE\NGUIdle_Data'
 ```
 
 The launcher builds to `build/wasm` and packages to `work/prepared/web`
@@ -91,7 +90,8 @@ location / {
 ## Verification
 
 Run the standalone save service tests with
-`python -m unittest discover -s tests -v`. They use temporary profiles in
+`just check` to verify the engine pin, compile-check WebAssembly and test
+the save service. The service tests use temporary profiles in
 `out/`. For the browser check, install Playwright and Chromium, start a
 separate host with an empty profile, and supply a compatible save fixture.
 

@@ -2,3 +2,8 @@
 __pycache__/
 out/
 node_modules/
+target/
+build/
+work/
+venvs/
+.cargo/config.toml

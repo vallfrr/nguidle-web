@@ -1,9 +1,6 @@
 services:
   game:
-    build:
-      context: .
-      additional_contexts:
-        engine: "${NGUIDLE_RUST:-../nguidle-rust}"
+    build: .
     init: true
     restart: unless-stopped
     mem_limit: ${NGU_MEMORY_LIMIT:-4g}

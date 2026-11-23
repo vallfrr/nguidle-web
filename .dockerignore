@@ -4,3 +4,8 @@
 out
 node_modules
 __pycache__
+target
+build
+work
+venvs
+.cargo
