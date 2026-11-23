@@ -1,8 +1,9 @@
 services:
   game:
     build:
-      context: ..
-      dockerfile: nguidle-web/Dockerfile
+      context: .
+      additional_contexts:
+        engine: "${NGUIDLE_RUST:-../nguidle-rust}"
     init: true
     restart: unless-stopped
     mem_limit: ${NGU_MEMORY_LIMIT:-4g}
