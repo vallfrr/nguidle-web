@@ -9,7 +9,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY Cargo.toml Cargo.lock engine.py ./
 COPY src src
-COPY server.py entrypoint.sh snapshot.py pack_assets.py web/
+COPY server.py profile_store.py entrypoint.sh snapshot.py pack_assets.py web/
 COPY package.json package-lock.json web/
 COPY public web/public
 RUN python3 -B engine.py --stage tools \

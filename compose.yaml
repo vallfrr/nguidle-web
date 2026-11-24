@@ -9,6 +9,7 @@ services:
       - "${NGU_BIND_ADDRESS:-127.0.0.1}:${NGU_PORT:-8080}:8080"
     environment:
       NGU_FETCH_MILESTONE_ICONS: "${NGU_FETCH_MILESTONE_ICONS:-1}"
+      NGU_BIND_ADDRESS: "${NGU_BIND_ADDRESS:-127.0.0.1}"
     volumes:
       - type: bind
         source: "${NGU_GAME_DATA:?Set NGU_GAME_DATA to your NGUIdle_Data directory}"

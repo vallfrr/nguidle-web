@@ -3,6 +3,7 @@
 
 use clr::{
     focus,
+    platform_api::{DrawTarget, TriangleList},
     render::{Renderer, ATLAS_SIZE},
     unity_api, Vm,
 };
@@ -111,22 +112,6 @@ impl View {
     }
 }
 
-#[repr(C)]
-struct Vertex {
-    pos: [f32; 2],
-    uv: [f32; 2],
-    color: [u8; 4],
-}
-
-#[repr(C)]
-struct Batch {
-    texture: u32,
-    nearest: u32,
-    clip: [i32; 4],
-    first: u32,
-    count: u32,
-}
-
 struct Button {
     at: (f32, f32),
     from_device: bool,
@@ -143,8 +128,7 @@ struct State {
     presented_pointer: (f32, f32),
     using_focus: bool,
     buttons: VecDeque<Button>,
-    vertices: Vec<Vertex>,
-    batches: Vec<Batch>,
+    draw: TriangleList,
     output: Vec<u8>,
     save_label: String,
 }
@@ -193,8 +177,7 @@ pub extern "C" fn web_boot() -> i32 {
             presented_pointer: (-1.0, -1.0),
             using_focus: false,
             buttons: VecDeque::new(),
-            vertices: Vec::new(),
-            batches: Vec::new(),
+            draw: TriangleList::default(),
             output: Vec::new(),
             save_label: "Autosave in 30s".into(),
         });
@@ -278,31 +261,7 @@ pub extern "C" fn web_frame(width: u32, height: u32, seconds: f32) -> usize {
         s.renderer.set_subframe_time(s.accumulator);
         s.renderer
             .emit_frame(&mut s.vm, s.view.scale, 0.0, s.view.top);
-        s.batches.clear();
-        s.vertices.clear();
-        for q in &s.renderer.quads {
-            let first = s.vertices.len() as u32;
-            let color = q.col.map(|c| (c.clamp(0.0, 1.0) * 255.0 + 0.5) as u8);
-            for i in [0, 1, 2, 0, 2, 3] {
-                s.vertices.push(Vertex {
-                    pos: q.p[i],
-                    uv: q.uv[i],
-                    color,
-                });
-            }
-            match s.batches.last_mut() {
-                Some(b) if (b.texture, b.nearest, b.clip) == (q.tex, q.nearest as u32, q.clip) => {
-                    b.count += 6
-                }
-                _ => s.batches.push(Batch {
-                    texture: q.tex,
-                    nearest: q.nearest as u32,
-                    clip: q.clip,
-                    first,
-                    count: 6,
-                }),
-            }
-        }
+        s.draw.draw_quads(&s.renderer.quads);
         let text = s.vm.eng.text_req.as_ref().and_then(|r| {
             focus::node_rect(&s.vm, &clr::unity::go_of(&r.comp))
                 .map(|rect| json!({"value": r.text, "max": r.max, "numeric": r.numeric, "rect": s.view.rect(rect)}))
@@ -334,19 +293,19 @@ pub extern "C" fn web_frame(width: u32, height: u32, seconds: f32) -> usize {
 
 #[no_mangle]
 pub extern "C" fn web_vertices() -> usize {
-    state(|s| s.vertices.as_ptr() as usize)
+    state(|s| s.draw.vertices.as_ptr() as usize)
 }
 #[no_mangle]
 pub extern "C" fn web_vertex_count() -> usize {
-    state(|s| s.vertices.len())
+    state(|s| s.draw.vertices.len())
 }
 #[no_mangle]
 pub extern "C" fn web_batches() -> usize {
-    state(|s| s.batches.as_ptr() as usize)
+    state(|s| s.draw.batches.as_ptr() as usize)
 }
 #[no_mangle]
 pub extern "C" fn web_batch_count() -> usize {
-    state(|s| s.batches.len())
+    state(|s| s.draw.batches.len())
 }
 #[no_mangle]
 pub extern "C" fn web_texture_size() -> usize {
@@ -521,31 +480,13 @@ impl State {
             "down" => 'd',
             "left" => 'l',
             "right" => 'r',
-            _ => ' ',
-        };
-        let modal = match action {
             "activate" => 'a',
             "back" => 'b',
-            _ => direction,
+            "prev" => 'p',
+            "next" => 'n',
+            _ => return,
         };
-        if self.vm.dropdown_navigate(modal) {
-            return;
-        }
-        let click = match action {
-            "activate" => focus::activation_point(&mut self.vm),
-            "prev" => focus::menu_step(&mut self.vm, -1),
-            "next" => focus::menu_step(&mut self.vm, 1),
-            "back" => {
-                if !self.vm.back_from_desktop_picker() {
-                    focus::clear(&mut self.vm);
-                }
-                None
-            }
-            _ => {
-                focus::navigate(&mut self.vm, direction);
-                None
-            }
-        };
+        let (click, _) = focus::pad_action(&mut self.vm, direction, false);
         if let Some(at) = click {
             self.buttons.push_back(Button {
                 at,
