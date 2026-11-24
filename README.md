@@ -7,7 +7,7 @@ The server delivers the build and stores a personal save profile.
 
 ## Docker Compose
 
-1. Clone this repository. Cargo fetches engine tag `v0.2.0` at the revision
+1. Clone this repository. Cargo fetches engine tag `v0.3.0` at the revision
    committed in `Cargo.lock`. The image build fetches and checks the matching
    engine data-preparation scripts.
 2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to

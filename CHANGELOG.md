@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Use engine `v0.3.0`, including the reference-tested random sequence corrections.
 - Keep valid browser events when an adjacent event is invalid, release held keys during text entry, and reject unacknowledged save locks.
 - Release decoded texture pixels after the WebGL upload and use engine tag `v0.2.0`.
 
