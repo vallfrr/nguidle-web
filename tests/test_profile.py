@@ -4,7 +4,16 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from server import LEASE_SECONDS, Profile, Rejected
+from profile_store import LEASE_SECONDS, Profile, Rejected
+from server import is_loopback
+
+
+class BindingTests(unittest.TestCase):
+    def test_only_loopback_addresses_are_treated_as_local(self):
+        for address in ("localhost", "127.0.0.1", "[::1]"):
+            self.assertTrue(is_loopback(address), address)
+        for address in ("0.0.0.0", "192.168.0.20", "[::]", "example.test"):
+            self.assertFalse(is_loopback(address), address)
 
 
 class ProfileTests(unittest.TestCase):
@@ -42,13 +51,13 @@ class ProfileTests(unittest.TestCase):
         self.query("claim", other, slot=1)
 
     def test_autosave_tracks_owner_and_lease_expiry_fences_old_browser(self):
-        with patch("server.time.time", return_value=200):
+        with patch("profile_store.time.time", return_value=200):
             self.query("claim", slot=3)
             self.query("autosave", slot=3, save="first")
             self.assertEqual(self.query("status", "phone")["locked"], [0, 3])
             with self.assertRaises(Rejected):
                 self.query("autosave", "phone", slot=3, save="unsaved")
-        with patch("server.time.time", return_value=200 + LEASE_SECONDS + 1):
+        with patch("profile_store.time.time", return_value=200 + LEASE_SECONDS + 1):
             self.query("claim", "phone", slot=3)
             with self.assertRaises(Rejected):
                 self.query("autosave", slot=3, save="late")
@@ -65,9 +74,9 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(self.query("profile")["files"], latest["files"])
 
     def test_same_browser_can_renew_after_outage_if_slot_was_not_claimed(self):
-        with patch("server.time.time", return_value=200):
+        with patch("profile_store.time.time", return_value=200):
             self.query("claim", slot=5)
-        with patch("server.time.time", return_value=200 + LEASE_SECONDS + 1):
+        with patch("profile_store.time.time", return_value=200 + LEASE_SECONDS + 1):
             self.assertEqual(self.query("status", "phone")["locked"], [])
             self.query("renew", slot=5)
             self.assertEqual(self.query("status", "phone")["locked"], [5])

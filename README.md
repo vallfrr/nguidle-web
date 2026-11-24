@@ -62,7 +62,7 @@ the original files.
   last server autosave. In **Load Game**, select an empty slot to use
   **Import Save File** or drop a save onto the game. Select a filled slot
   to use **Export Save**.
-- **Save Game → Export Current Game** downloads live progress during
+- **Save Game â†’ Export Current Game** downloads live progress during
   gameplay, including during a connection outage. During an outage the
   game keeps running in the browser and shows **Save server unavailable**
   in the autosave area. Opening a saved game requires the save server.
@@ -79,6 +79,9 @@ For trusted LAN or Tailscale access, set `NGU_BIND_ADDRESS` (or
 `-BindAddress` in the launcher) to the interface address. Clients that can
 reach the service share the personal profile. For a personal domain,
 configure TLS and access control in Nginx and preserve the incoming Host.
+The server warns at startup when the published address is outside loopback.
+The HTTP origin check does not authenticate users. Keep the backend bound
+to loopback when a reverse proxy provides access control.
 
 ```nginx
 location / {

@@ -27,5 +27,5 @@ if [ ! -s "$cache/runtime.wasm" ] || [ ! -s "$cache/game.pak" ]; then
 fi
 exec 9>&-
 
-exec python web/server.py --host 0.0.0.0 --port 8080 \
+exec python web/server.py --host 0.0.0.0 --port 8080 --published-host "${NGU_BIND_ADDRESS:-0.0.0.0}" \
     --build "$cache" --assets "$cache/assets" --save /profile
