@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Run the browser adapter on the engine's `Session` instead of its own host loop (fixed-step time, input queue, focus pointer).
 - Use engine `v0.5.0`; add `AGENTS.md` and `engine.tag`, and document how this port relates to the engine's port template.
 
 - Use engine `v0.3.0`, including the reference-tested random sequence corrections.
