@@ -13,3 +13,12 @@ together, followed by `just check` and a browser check.
 The game is verified and extracted locally from the mounted Steam
 installation. The image downloads build dependencies and can compile from
 the cached dependencies after validating the installation.
+
+## Relation to the engine's port template
+This port follows the layout of the engine's port template (`just new-port` in nguidle-rust): `AGENTS.md`, `engine.tag`,
+`justfile` with `check`, the same hygiene check and the same GitHub workflow shape. The justified differences are the platform:
+the crate builds a WebAssembly reactor (`src/lib.rs`, a `cdylib`) instead of a native binary and implements the engine's
+interface through the browser adapter's event protocol rather than `clr::session::Session`; the draw list reaches WebGL through
+`platform_api::TriangleList`; saves are owned by the Python server (`profile_store.py`) rather than a local folder; and CI also
+runs the JavaScript tests. Moving the adapter onto `Session` is possible but would change its timing and save-lease behaviour, so
+it waits for a browser verification.

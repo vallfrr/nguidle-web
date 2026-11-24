@@ -33,6 +33,8 @@ def read_pin():
     ]
     if len(revisions) != 1 or not re.fullmatch(r"[0-9a-f]{40}", revisions[0]):
         raise ValueError("The engine tag and Cargo.lock disagree.")
+    if (ROOT / "engine.tag").read_text(encoding="utf-8").strip() != engine["tag"]:
+        raise ValueError("engine.tag and Cargo.toml name different engine tags.")
     return engine["git"], engine["tag"], revisions[0]
 
 
