@@ -1,6 +1,7 @@
 ---
 name: Bug report
 about: Report a problem that can be reproduced
+labels: bug
 ---
 
 ## Platform and version

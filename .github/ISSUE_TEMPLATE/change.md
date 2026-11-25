@@ -1,6 +1,7 @@
 ---
 name: Change proposal
 about: Describe an improvement and how to verify it
+labels: proposal
 ---
 
 ## Goal
