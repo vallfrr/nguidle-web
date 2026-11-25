@@ -1,8 +1,9 @@
 //! Browser WASI reactor. The engine runs entirely inside the browser.
 #![cfg(any(target_arch = "wasm32", test))]
 
+#[cfg(feature = "audit")]
+use clr::focus;
 use clr::{
-    focus,
     platform_api::{Action, Engine, MouseButton, Pointer, TriangleList},
     session::{Session, SessionConfig},
     Vm,
@@ -123,7 +124,7 @@ fn state<T: Default>(f: impl FnOnce(&mut State) -> T) -> T {
 #[no_mangle]
 pub extern "C" fn web_boot() -> i32 {
     let mut config = SessionConfig::new("/game", "/save", 960, 540);
-    config.before_home = Some(|vm: &mut Vm| vm.enable_browser_saves());
+    config.before_home = Some(|vm: &mut Vm| vm.enable_hosted_saves());
     let session = match Session::open(config) {
         Ok(session) => session,
         Err(error) => {
@@ -198,32 +199,22 @@ pub extern "C" fn web_frame(width: u32, height: u32, seconds: f32) -> usize {
         s.draw.batches.clear();
         s.session.draw(&mut s.draw);
         let view = s.view;
-        let vm = s.session.vm();
-        vm.browser_autosave_label(&s.save_label);
-        let text = vm.eng.text_req.as_ref().and_then(|r| {
-            focus::node_rect(vm, &clr::unity::go_of(&r.comp))
-                .map(|rect| json!({"value": r.text, "max": r.max, "numeric": r.numeric, "rect": view.rect(rect)}))
+        s.session.hosted_autosave_label(&s.save_label);
+        let text = s.session.text_field().map(|t| {
+            json!({"value": t.value, "max": t.max, "numeric": t.numeric, "rect": view.rect(t.rect)})
         });
-        let file = vm.browser_file_request();
-        let resolution = vm
-            .eng
-            .resolution_req
-            .take()
-            .and_then(|(width, height, fullscreen, at)| {
-                if at <= STARTUP_RESOLUTION_GUARD_FRAMES {
-                    return None;
-                }
-                let (width, height) = clr::desktop_layout::pc_resolution(width, height);
-                Some((width, height, fullscreen))
-            });
-        let import = vm
-            .browser_import_control()
+        let file = s.session.hosted_file_request();
+        let resolution = s
+            .session
+            .take_resolution_request_after(STARTUP_RESOLUTION_GUARD_FRAMES);
+        let import = s
+            .session
+            .hosted_import_control()
             .map(|(slot, rect)| (slot, view.rect(rect)));
         let sounds = s.session.take_sounds();
-        let vm = s.session.vm();
         s.output = serde_json::to_vec(&json!({
-            "active": vm.browser_active_slot(), "request": vm.browser_requested_slot(),
-            "home": vm.at_desktop_start(), "text": text, "sounds": sounds, "file": file, "import": import,
+            "active": s.session.hosted_active_slot(), "request": s.session.hosted_requested_slot(),
+            "home": s.session.at_home(), "text": text, "sounds": sounds, "file": file, "import": import,
             "resolution": resolution,
         })).unwrap();
         s.output.len()
@@ -317,22 +308,19 @@ impl State {
                 online,
                 locked,
                 reload,
-            } => self
-                .session
-                .vm()
-                .browser_profile_changed(online, locked, reload),
+            } => self.session.hosted_profile_changed(online, locked, reload),
             Event::Lease { granted } => {
-                return Some(json!({"error": self.session.vm().browser_finish_request(granted).err()}))
+                return Some(json!({"error": self.session.hosted_finish_request(granted).err()}))
             }
             Event::SaveLabel { message } => self.save_label = message,
-            Event::Notice { message } => self.session.vm().browser_save_notice(message),
+            Event::Notice { message } => self.session.hosted_save_notice(message),
             Event::Import { slot } => {
                 return Some(
-                    json!({"error": self.session.vm().import_browser_save("upload.txt", slot).err()}),
+                    json!({"error": self.session.import_hosted_save("upload.txt", slot).err()}),
                 )
             }
             Event::Export { slot } => {
-                return Some(match self.session.vm().browser_export(slot) {
+                return Some(match self.session.hosted_export(slot) {
                     Ok(save) => json!({"save": save}),
                     Err(error) => json!({"error": error}),
                 })
