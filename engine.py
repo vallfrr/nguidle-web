@@ -1,4 +1,4 @@
-"""Stage the engine's data tools from the same revision Cargo resolves."""
+"""Stage the engine's data preparation (its source, and the icon tool) from the same revision Cargo resolves."""
 
 import argparse
 from pathlib import Path
@@ -10,10 +10,7 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent
 TOOLS = (
-    "requirements-prep.txt",
-    "verify_game_data.py",
-    "game-data.sha256.json",
-    "nguprep.py",
+    "requirements-icons.txt",
     "fetch-achievement-icons.py",
 )
 
@@ -54,13 +51,30 @@ def stage_tools(destination, remote, tag, revision):
         (destination / name).write_bytes(data)
 
 
+def stage_source(destination, remote, tag, revision):
+    destination.mkdir(parents=True, exist_ok=True)
+
+    def git(*arguments):
+        return subprocess.check_output(["git", "-C", str(destination), *arguments])
+
+    git("init", "--quiet")
+    git("fetch", "--quiet", "--depth=1", remote, f"refs/tags/{tag}")
+    resolved = git("rev-parse", "FETCH_HEAD^{commit}").decode().strip()
+    if resolved != revision:
+        raise ValueError(f"{tag} points to {resolved}, but Cargo.lock pins {revision}.")
+    git("checkout", "--quiet", "--detach", revision)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", type=Path)
+    parser.add_argument("--stage-source", type=Path)
     args = parser.parse_args()
     pin = read_pin()
     if args.stage:
         stage_tools(args.stage, *pin)
+    if args.stage_source:
+        stage_source(args.stage_source, *pin)
     print(f"{pin[1]} {pin[2]}")
 
 

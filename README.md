@@ -8,10 +8,11 @@ The server delivers the build and stores a personal save profile.
 ## Docker Compose
 
 1. Clone this repository. Cargo fetches the engine tag recorded in `engine.tag` at the revision
-   committed in `Cargo.lock`. The image build fetches and checks the matching
-   engine data-preparation scripts.
+   committed in `Cargo.lock`. The image build fetches the matching engine
+   revision, checks it and builds its data preparation program.
 2. Copy `.env.example` to `.env` in `nguidle-web/`. Set `NGU_GAME_DATA` to
-   the absolute path of your Steam Windows 1.260 `NGUIdle_Data` directory.
+   the absolute path of your Steam Windows 1.260 `NGU IDLE` folder (the one
+   that contains `NGUIdle.exe` and `NGUIdle_Data`).
 3. Run `docker compose up --build` and open
    [http://localhost:8080](http://localhost:8080) when the service is healthy.
 
@@ -28,13 +29,13 @@ names and conditions remain available.
 
 ## Local Windows preview
 
-Install Python 3.11 or later, npm, Git and Rustup. The launcher prepares the
-assets from the game installation. Use `-Assets` to reuse compatible
+Install Python 3.11 or later, npm, Git and Rustup. The launcher builds the
+engine's preparation program and prepares the assets from the game installation. Use `-Assets` to reuse compatible
 prepared data if you already have them. The toolchain file selects the
 required WebAssembly target.
 
 ```powershell
-$gameData = Read-Host 'Path to NGUIdle_Data'
+$gameData = Read-Host 'Path to the NGU IDLE folder'
 .\start-local.ps1 -GameData $gameData
 ```
 

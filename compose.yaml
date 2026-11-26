@@ -12,7 +12,7 @@ services:
       NGU_BIND_ADDRESS: "${NGU_BIND_ADDRESS:-127.0.0.1}"
     volumes:
       - type: bind
-        source: "${NGU_GAME_DATA:?Set NGU_GAME_DATA to your NGUIdle_Data directory}"
+        source: "${NGU_GAME_DATA:?Set NGU_GAME_DATA to your NGU IDLE game folder}"
         target: /game-data
         read_only: true
         bind:
