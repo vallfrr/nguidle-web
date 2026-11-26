@@ -1,8 +1,6 @@
 //! Browser WASI reactor. The engine runs entirely inside the browser.
 #![cfg(any(target_arch = "wasm32", test))]
 
-#[cfg(feature = "audit")]
-use clr::focus;
 use clr::{
     platform_api::{Action, Engine, MouseButton, Pointer, TriangleList},
     session::{Session, SessionConfig},
@@ -327,18 +325,14 @@ impl State {
             }
             #[cfg(feature = "audit")]
             Event::Audit { steps } => {
-                let vm = self.session.vm();
-                clr::script::run_steps(vm, &steps);
-                let menus: Vec<_> = clr::dev::menu_roots(vm)
-                    .iter()
-                    .map(|node| clr::unity::with_go(node, |go| (go.name.clone(), go.port_hidden)))
-                    .collect();
-                let text = focus::visible_texts(vm);
-                let controls: Vec<_> = focus::collect(vm)
+                self.session.run_script(&steps);
+                let seen = self.session.inspect();
+                let controls: Vec<_> = seen
+                    .controls
                     .into_iter()
                     .map(|node| (node.label, node.rect, node.kind))
                     .collect();
-                return Some(json!({"menus": menus, "text": text, "controls": controls}));
+                return Some(json!({"menus": seen.menus, "text": seen.text, "controls": controls}));
             }
             Event::Reset => self.session.reset_input(),
         }
