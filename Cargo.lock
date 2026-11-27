@@ -96,7 +96,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 [[package]]
 name = "cil-interp"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.3#678759ae3de0e6acb891d64cc28154a63f0772a9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.4#57c05cc8e9050014e0b4ab7ddcd0c6695eff8214"
 
 [[package]]
 name = "cipher"
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "clr"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.3#678759ae3de0e6acb891d64cc28154a63f0772a9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.4#57c05cc8e9050014e0b4ab7ddcd0c6695eff8214"
 dependencies = [
  "aes",
  "cil-interp",
@@ -472,7 +472,7 @@ checksum = "c938015719552d665fd0553b90d96cd7ff58e83e4c061ca99e6bb78865a72752"
 [[package]]
 name = "platform-api"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.3#678759ae3de0e6acb891d64cc28154a63f0772a9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.4#57c05cc8e9050014e0b4ab7ddcd0c6695eff8214"
 
 [[package]]
 name = "png"
@@ -569,7 +569,7 @@ checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
 [[package]]
 name = "save-format"
 version = "0.1.0"
-source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.3#678759ae3de0e6acb891d64cc28154a63f0772a9"
+source = "git+https://github.com/vallfrr/nguidle-rust.git?tag=v0.12.4#57c05cc8e9050014e0b4ab7ddcd0c6695eff8214"
 
 [[package]]
 name = "scroll"
