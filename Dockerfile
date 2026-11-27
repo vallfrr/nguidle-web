@@ -7,7 +7,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Cargo.toml Cargo.lock engine.py engine.tag .//
+COPY Cargo.toml Cargo.lock engine.py ./
 COPY src src
 RUN cargo build --locked --release --target wasm32-wasip1 --package ngu-browser
 
@@ -26,7 +26,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=wasm /app/target/wasm32-wasip1/release/ngu_browser.wasm /app/runtime.wasm
 COPY --from=prep /engine/target/release/ngu-prepare /app/ngu-prepare
-COPY Cargo.toml Cargo.lock engine.py engine.tag .//
+COPY Cargo.toml Cargo.lock engine.py engine.tag ./
 COPY server.py profile_store.py entrypoint.sh pack_assets.py web/
 COPY package.json package-lock.json web/
 COPY public web/public
