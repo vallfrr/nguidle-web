@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Prepare the game data with the engine's Rust program `ngu-prepare` instead of the Python tools. `NGU_GAME_DATA` is now the `NGU IDLE` game folder (the sounds need `UnityPlayer.dll`), not `NGUIdle_Data`. The image builds `ngu-prepare` from the pinned engine revision.
+
 - Use engine `v0.9.0` and its public `Session` methods for saves, text entry and the start-up resolution; the port, including its `audit` build, no longer reaches into the engine through `Session::vm()`.
 - Run the browser adapter on the engine's `Session` instead of its own host loop (fixed-step time, input queue, focus pointer).
 - Use engine `v0.5.0`; add `AGENTS.md` and `engine.tag`, and document how this port relates to the engine's port template.
