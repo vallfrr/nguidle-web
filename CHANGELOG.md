@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Use engine `v0.12.3`: time a hidden tab or a sleeping phone spent away is applied as the game's own offline progress when the page runs again (first frame back about 9 ms), with the game's "You were offline" screen. A save is now stamped with the current time before each autosave, so a reloaded page no longer counts the previous session twice.
 - Use engine `v0.12.2`: float arithmetic and `GetComponentInChildren` behave like the original game, offline progress is tested against it. A save still comes back identical to the byte (v0.12.0 and later).
 - Prepare the game data with the engine's Rust program `ngu-prepare` instead of the Python tools. `NGU_GAME_DATA` is now the `NGU IDLE` game folder (the sounds need `UnityPlayer.dll`), not `NGUIdle_Data`. The image builds `ngu-prepare` from the pinned engine revision.
 

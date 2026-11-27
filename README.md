@@ -73,6 +73,7 @@ the original files.
   If another device takes the slot during an outage, export current progress
   before reloading.
   The shared engine calculates offline progress when opening a save.
+  It also applies it when the page runs again after being hidden or suspended.
 
 ## LAN and personal reverse proxy
 
