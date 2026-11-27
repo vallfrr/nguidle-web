@@ -1,4 +1,6 @@
+import base64
 from concurrent.futures import ThreadPoolExecutor
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -114,6 +116,31 @@ class ProfileTests(unittest.TestCase):
             self.profile = Profile(location)
             self.assertEqual(self.query("profile")["files"], {})
             self.assertEqual(source.read_text(encoding="utf-8"), "desktop save")
+
+    def test_a_save_comes_back_identical_to_the_byte(self):
+        # A save is a text file in the game's own format: the server stores and returns it as is (D5).
+        # Realistic size (125 KB of base64), with the line endings and spaces a hand-edited file might carry.
+        body = base64.b64encode(os.urandom(93_000)).decode()
+        saves = (body, body + "\n", body + "\r\n", " " + body + " ")
+        for slot, save in enumerate(saves, start=1):
+            self.query("claim", slot=slot)
+            written = self.query("write", slot=slot, changes={f"slots/slot-{slot}.txt": {"value": save, "revision": None}})
+            self.assertEqual(written["files"][f"slots/slot-{slot}.txt"].encode(), save.encode())
+        self.query("claim", slot=5)
+        self.query("autosave", slot=5, save=body + "\n")
+        self.profile = Profile(self.location)  # restart: everything is read back from SQLite
+        files = self.query("profile")["files"]
+        for slot, save in enumerate(saves, start=1):
+            self.assertEqual(files[f"slots/slot-{slot}.txt"].encode(), save.encode())
+        self.assertEqual(files["NGUSaveSteam.txt"].encode(), (body + "\n").encode())
+
+    def test_a_flat_file_migrates_to_the_byte_even_with_windows_line_endings(self):
+        with TemporaryDirectory(dir=self.location) as folder:
+            location = Path(folder)
+            (location / "slots").mkdir()
+            (location / "slots/slot-1.txt").write_bytes(b"first\r\nsecond\r\n")
+            self.profile = Profile(location)
+            self.assertEqual(self.query("profile")["files"]["slots/slot-1.txt"].encode(), b"first\r\nsecond\r\n")
 
 
 if __name__ == "__main__":

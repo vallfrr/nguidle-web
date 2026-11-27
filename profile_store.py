@@ -41,7 +41,7 @@ class Profile:
                         continue
                     if path.is_file() and not path.is_symlink() and path.stat().st_size <= MAX_SAVE:
                         db.execute("INSERT INTO files VALUES (?, ?, ?)", (
-                            name, path.read_text(encoding="utf-8-sig"), path.stat().st_mtime_ns // 1_000_000,
+                            name, path.read_bytes().decode("utf-8-sig"), path.stat().st_mtime_ns // 1_000_000,
                         ))
 
     def connect(self):
