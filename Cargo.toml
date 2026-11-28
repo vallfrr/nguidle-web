@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 audit = []
 
 [dependencies]
-clr = { git = "https://github.com/vallfrr/nguidle-rust.git", tag = "v0.12.14" }
+clr = { git = "https://github.com/vallfrr/nguidle-rust.git", tag = "v0.12.15" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 
